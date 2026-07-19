@@ -1,0 +1,12 @@
+{
+  "name": "wind-ops-agent-backend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "python -m pytest",
+    "test:router": "python -m pytest tests/unit/services/test_intent_router.py",
+    "build": "python scripts/build.py",
+    "check:deps": "python scripts/check_deps.py",
+    "clean": "powershell -Command \"Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force; Remove-Item -Recurse -Force .pytest_cache -ErrorAction SilentlyContinue\""
+  }
+}

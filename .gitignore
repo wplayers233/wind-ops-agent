@@ -1,0 +1,29 @@
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node / frontend builds
+node_modules/
+dist/
+apps/frontend/dist/
+*.tsbuildinfo
+
+# Backend generated data
+apps/backend/.pytest_cache/
+apps/backend/.tmp/
+
+# Editors and operating systems
+.cursor/
+.omo/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

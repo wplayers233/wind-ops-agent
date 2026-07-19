@@ -1,0 +1,77 @@
+{
+  "task_rules": [
+    {
+      "name": "health_check",
+      "priority": 120,
+      "patterns": ["^(你好|hi|hello|在吗|test)$", "^状态$", "^health$"],
+      "terms": ["你是谁", "系统在吗", "在线吗"]
+    },
+    {
+      "name": "fault_diagnosis",
+      "priority": 110,
+      "patterns": ["故障", "报警", "异常", "报错", "跳闸", "中断", "过温", "过压", "过载", "怎么排查", "什么原因"],
+      "terms": ["排查", "定位", "原因", "无法复位", "通讯中断"]
+    },
+    {
+      "name": "safety_check",
+      "priority": 105,
+      "patterns": ["安全", "停机", "断电", "挂牌", "高压", "风险", "能不能带电"],
+      "terms": ["是否安全", "要不要停机", "带电检查"]
+    },
+    {
+      "name": "ticket_create",
+      "priority": 100,
+      "patterns": ["工单", "派单", "报修", "生成.*工单", "维修记录"],
+      "terms": ["创建工单", "提交工单", "安排处理", "整理记录"]
+    },
+    {
+      "name": "repair_guidance",
+      "priority": 90,
+      "patterns": ["怎么处理", "检修步骤", "维修", "更换", "处理流程"],
+      "terms": ["处理步骤", "维修方案", "操作步骤"]
+    },
+    {
+      "name": "diagram_lookup",
+      "priority": 85,
+      "patterns": ["图纸", "接线图", "结构图", "原理图", "图解", "端子"],
+      "terms": ["接线", "端子号", "图解说明"]
+    },
+    {
+      "name": "document_retrieval",
+      "priority": 80,
+      "patterns": ["查.*文档", "查.*资料", "查.*手册", "知识库", "规程", "说明书", "找.*(原因|步骤|处理)"],
+      "terms": ["查一下", "帮我找", "资料"]
+    }
+  ],
+  "asset_rules": {
+    "systems": [
+      {"name": "pitch_system", "component": "变桨系统", "terms": ["变桨", "桨距", "pitch", "变桨系统", "桨叶角"]},
+      {"name": "gearbox_system", "component": "齿轮箱", "terms": ["齿轮箱", "gearbox", "润滑油", "油温", "轴承"]},
+      {"name": "yaw_system", "component": "偏航系统", "terms": ["偏航", "yaw", "偏航电机", "偏航制动"]},
+      {"name": "converter_system", "component": "变流器", "terms": ["变流器", "converter", "母线", "直流母线", "逆变"]},
+      {"name": "electrical_system", "component": "电气柜", "terms": ["电气柜", "高压", "断路器", "端子", "接线", "控制柜"]},
+      {"name": "tower_system", "component": "塔筒", "terms": ["塔筒", "爬塔", "塔内", "塔基"]},
+      {"name": "main_shaft_system", "component": "主轴", "terms": ["主轴", "轴承座", "联轴器"]}
+    ],
+    "fault_domains": [
+      {"name": "communication_fault", "terms": ["通讯中断", "通信故障", "CAN异常", "失联", "通讯异常", "通信中断"]},
+      {"name": "over_temperature", "terms": ["油温过高", "高温", "过温", "温升异常", "冷却效率低"]},
+      {"name": "over_voltage", "terms": ["过压", "母线过压", "直流母线过压", "电压升高"]},
+      {"name": "overload", "terms": ["过载", "电流过高", "卡滞", "负载异常"]},
+      {"name": "electrical_risk", "terms": ["高压", "带电", "断电", "挂牌", "电气安全"]},
+      {"name": "mechanical_wear", "terms": ["磨损", "异响", "振动", "轴承损伤"]},
+      {"name": "lubrication_fault", "terms": ["润滑", "油液", "油脂", "污染", "油液发黑"]},
+      {"name": "sensor_fault", "terms": ["传感器", "编码器", "反馈异常", "信号异常"]}
+    ],
+    "locations": ["塔筒", "机舱", "轮毂", "塔基", "变桨柜", "控制柜"],
+    "operation_statuses": ["运行中", "已停机", "停机", "无法复位", "限功率", "并网", "待机"]
+  },
+  "slot_rules": {
+    "model_patterns": ["[A-Za-z]{0,4}\\d{2,4}-?\\d+(?:\\.\\d+)?MW", "\\d+(?:\\.\\d+)?MW"],
+    "alarm_code_patterns": ["[A-Z]{2,}[_-][A-Z0-9_]+", "E-\\d+", "[A-Z]+\\d{2,}"],
+    "turbine_id_patterns": ["#\\d+", "[A-Za-z]{1,4}-?\\d{1,4}号?机组"],
+    "image_terms": ["图片", "照片", "截图", "图纸", "接线图", "现场图"],
+    "urgency_high_terms": ["紧急", "停机", "跳闸", "高压", "冒烟", "无法复位"],
+    "urgency_medium_terms": ["报警", "异常", "过温", "过压", "过载"]
+  }
+}

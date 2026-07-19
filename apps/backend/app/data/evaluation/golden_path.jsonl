@@ -1,0 +1,4 @@
+{"id":"case-001","question":"2.5MW 变桨系统通讯中断，报 PITCH_COMM_LOST，怎么排查？","reference_answer":"检查供电、CAN线缆、报警码和编码器。","reference_contexts":["doc-001"],"expected_component":"变桨系统","risk_level":"high","requires_citation":true}
+{"id":"case-002","question":"齿轮箱油温高怎么处理？","reference_answer":"检查油位、冷却器、滤芯和轴承振动。","reference_contexts":["doc-002"],"expected_component":"齿轮箱","risk_level":"medium","requires_citation":true}
+{"id":"case-003","question":"偏航电机过载报警怎么排查？","reference_answer":"检查卡滞、制动器、齿圈异物和润滑。","reference_contexts":["doc-003"],"expected_component":"偏航系统","risk_level":"high","requires_citation":true}
+{"id":"case-004","question":"变流器直流母线过压 CONV_DC_OV 如何处理？","reference_answer":"检查电网、制动单元、参数并在必要时停机。","reference_contexts":["doc-004"],"expected_component":"变流器","risk_level":"high","requires_citation":true}
