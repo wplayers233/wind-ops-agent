@@ -6,11 +6,14 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import RLock
 from time import time
 from typing import Any
+import logging
 import math
 import os
 
 from app.services.providers import build_embedding_provider
 from app.services.storage import MilvusBackend, RedisBackend
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,6 +35,7 @@ class MemoryStore:
         self.distance_threshold = distance_threshold if distance_threshold is not None else float(os.getenv("MEMORY_DISTANCE_THRESHOLD", "0.65"))
         self._redis_like: dict[str, dict] = {}
         self._milvus_like: list[MemoryRecord] = []
+        self._persist_errors: dict[str, str] = {}
         self._lock = RLock()
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="memory-write")
         self._embedding_provider, self.embedding_mode = build_embedding_provider()
@@ -45,7 +49,9 @@ class MemoryStore:
             current = deepcopy(self._redis_like.get(session_id, self._empty_state()))
             current["long_memory"] = self.search_long_memory(session_id, current.get("context", ""), top_k=5)
             current["memory_mode"] = self.memory_mode
-            current["persist_status"] = "ready"
+            persist_error = self._persist_errors.get(session_id, "")
+            current["persist_error"] = persist_error
+            current["persist_status"] = "error" if persist_error else "ready"
             return current
 
     def update(self, session_id: str, payload: dict) -> dict:
@@ -63,11 +69,13 @@ class MemoryStore:
             self._redis_like[session_id] = current
             self._milvus_like.append(record)
             self._purge_long_memory_locked(now)
-            self._executor.submit(self._persist_remote, record, current)
+            # Hand the executor its own snapshot; `current` keeps being mutated under the lock.
+            self._executor.submit(self._persist_remote, record, deepcopy(current))
             result = deepcopy(current)
             result["long_memory"] = self.search_long_memory(session_id, result["context"], top_k=5)
             result["memory_mode"] = self.memory_mode
             result["persist_status"] = "queued"
+            result["persist_error"] = self._persist_errors.get(session_id, "")
             return result
 
     def _persist_remote(self, record: MemoryRecord, state: dict) -> None:
@@ -79,8 +87,13 @@ class MemoryStore:
                 self.redis_backend.set(f"memory:{record.session_id}", state, self.short_ttl_seconds)
             if self.milvus_backend and self.milvus_backend.available:
                 self.milvus_backend.upsert([{"id": f"{record.session_id}-{int(record.created_at * 1000000)}", **asdict(record), "vector": record.vector or []}])
-        except Exception:
+        except Exception as exc:
+            with self._lock:
+                self._persist_errors[record.session_id] = str(exc) or exc.__class__.__name__
+            logger.warning("memory persist failed for session %s: %s", record.session_id, exc)
             return
+        with self._lock:
+            self._persist_errors.pop(record.session_id, None)
 
     def search_long_memory(self, session_id: str, query: str, top_k: int = 5, distance_threshold: float | None = None) -> list[dict]:
         with self._lock:
@@ -115,7 +128,7 @@ class MemoryStore:
         return sum(a * b for a, b in zip(left, right)) / denom if denom else 0.0
 
     def _empty_state(self) -> dict:
-        return {"history": [], "summary": "", "short_memory": [], "long_memory": [], "context": "", "memory_mode": self.memory_mode, "persist_status": "idle"}
+        return {"history": [], "summary": "", "short_memory": [], "long_memory": [], "context": "", "memory_mode": self.memory_mode, "persist_status": "idle", "persist_error": ""}
 
     def _purge_expired_locked(self, session_id: str) -> None:
         current = self._redis_like.get(session_id)

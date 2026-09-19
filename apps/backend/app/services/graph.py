@@ -172,8 +172,7 @@ def build_graph(
         if searcher is retriever:
             result = assess_safety_tool.invoke({"query": state["query"], "evidence": state.get("evidence", [])})
         else:
-            evidence = state.get("evidence", [])
-            result = assess_safety(state["query"], evidence[0] if evidence else {})
+            result = assess_safety(state["query"], state.get("evidence", []))
         return {
             "safety_result": result,
             "risk_level": result.get("risk_level", "unknown"),

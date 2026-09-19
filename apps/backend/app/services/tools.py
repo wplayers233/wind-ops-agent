@@ -31,8 +31,7 @@ def retrieve_with_retriever(retriever_obj: Any, query: str, filters: dict[str, A
 @tool
 def assess_safety_tool(query: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
     """Assess operational risk before any answer is generated."""
-    best = evidence[0] if evidence else {}
-    return assess_safety(query, best)
+    return assess_safety(query, evidence)
 
 
 @tool

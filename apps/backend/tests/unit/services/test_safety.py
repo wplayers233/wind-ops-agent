@@ -28,3 +28,18 @@ def test_high_risk_query_without_evidence_does_not_drop_to_low() -> None:
 
     assert result["risk_level"] == "high"
     assert result["needs_confirmation"] is True
+
+
+def test_rank_two_high_risk_evidence_triggers_gate() -> None:
+    result = assess_safety("柜内温度异常", [{"title": "清洁保养手册", "safety_level": "low"}, {"title": "高压柜维护手册", "safety_level": "high"}])
+
+    assert result["risk_level"] == "high"
+    assert result["needs_confirmation"] is True
+
+
+def test_safety_tool_consumes_full_evidence_list() -> None:
+    from app.services.tools import assess_safety_tool
+
+    result = assess_safety_tool.invoke({"query": "柜内温度异常", "evidence": [{"title": "清洁保养手册", "safety_level": "low"}, {"title": "高压柜维护手册", "safety_level": "high"}]})
+
+    assert result["risk_level"] == "high"

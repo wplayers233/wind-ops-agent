@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from threading import RLock
 from typing import Any
 
 from app.data.mock_docs import MOCK_DOCS
@@ -26,11 +27,32 @@ class Retriever:
         self.local_index = LocalHybridIndex(self.docs)
         self.vector_store = MultimodalVectorStore()
         self.vector_store.upsert(self.docs)
+        self._lock = RLock()
 
     def replace_docs(self, docs: list[dict]) -> None:
-        self.docs = docs
-        self.local_index = LocalHybridIndex(self.docs)
-        self.vector_store.upsert(self.docs)
+        with self._lock:
+            self.docs = docs
+            self.local_index = LocalHybridIndex(self.docs)
+            self.vector_store.upsert(self.docs)
+
+    def append_docs(self, new_docs: list[dict]) -> tuple[list[dict], list[str]]:
+        """Merge documents by id, skipping duplicates. Returns (added, warnings)."""
+        with self._lock:
+            existing_ids = {doc.get("id") for doc in self.docs}
+            added: list[dict] = []
+            warnings: list[str] = []
+            for doc in new_docs:
+                doc_id = doc.get("id")
+                if doc_id in existing_ids:
+                    warnings.append(f"duplicate:{doc_id}")
+                    continue
+                existing_ids.add(doc_id)
+                added.append(doc)
+            if added:
+                self.docs = self.docs + added
+                self.local_index = LocalHybridIndex(self.docs)
+                self.vector_store.upsert(self.docs)
+            return added, warnings
 
     def _expand_query(self, query: str) -> list[str]:
         normalized = (query or "").strip()

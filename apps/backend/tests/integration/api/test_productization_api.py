@@ -38,3 +38,27 @@ def test_experiment_summary_separates_baseline_and_system():
     assert result['experiment_kind'] == 'internal_simulation'
     assert result['groups']['baseline']['mean_resolution_minutes'] == 42
     assert result['groups']['system']['self_service_rate'] == 1.0
+
+
+def test_ingest_duplicate_upload_is_skipped_with_warning():
+    from app.services.retriever import retriever
+
+    client = TestClient(app)
+    before = len(retriever.docs)
+    first = client.post('/ingest', files={'file': ('dedup-check.txt', b'gearbox oil temperature high', 'text/plain')})
+    second = client.post('/ingest', files={'file': ('dedup-check.txt', b'gearbox oil temperature high', 'text/plain')})
+
+    assert first.json()['status'] == 'ready'
+    assert second.json()['status'] == 'ready'
+    assert 'duplicate:dedup-check' in second.json()['warnings']
+    assert len(retriever.docs) == before + 1
+
+
+def test_ingest_rejects_oversized_upload(monkeypatch):
+    from app import main as main_module
+
+    monkeypatch.setattr(main_module, 'MAX_UPLOAD_BYTES', 4)
+    response = TestClient(app).post('/ingest', files={'file': ('big.txt', b'123456', 'text/plain')})
+
+    assert response.json()['status'] == 'failed'
+    assert 'upload limit' in response.json()['error']

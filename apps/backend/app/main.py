@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -138,30 +139,40 @@ def retrieve(payload: RetrieveRequest) -> dict:
     return {"query": payload.query, "top_k": payload.top_k, "results": [_retrieve_item(item) for item in retriever.retrieve(payload.query, payload.top_k, filters=payload.filters, distance_threshold=payload.distance_threshold)]}
 
 
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+
+def _process_ingestion(data: bytes, filename: str, suffix: str) -> dict:
+    documents = (
+        [{"id": Path(filename).stem, "title": filename, "content": data.decode("utf-8", errors="replace"), "source": filename, "page": 1, "content_type": "text"}]
+        if suffix in {".txt", ".md"}
+        else parse_binary(data, filename, suffix)
+    )
+    report = build_ingestion_report(documents, provider_mode="auto")
+    validated: list[DocumentModel] = []
+    warnings: list[str] = []
+    for document in documents:
+        item = {"id": document.get("id") or f"{Path(filename).stem}-1", "title": document.get("title") or filename, "source": document.get("source", filename), "page": document.get("page", 1), **document}
+        try:
+            validated.append(DocumentModel.model_validate(item))
+        except Exception as exc:
+            warnings.append(f"skip:{item.get('id', 'unknown')}:{exc}")
+    normalized = [doc.model_dump() for doc in validated]
+    added, duplicate_warnings = retriever.append_docs(normalized)
+    warnings.extend(duplicate_warnings)
+    return _ingestion_payload(filename, report["status"], report, warnings=warnings)
+
+
 @app.post("/ingest", response_model=IngestionResponse)
 async def ingest(file: UploadFile = File(...)) -> dict:
     filename = file.filename or "upload.bin"
     suffix = Path(filename).suffix.lower()
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        return _ingestion_payload(filename, "failed", {}, f"file exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit")
     try:
-        data = await file.read()
-        documents = (
-            [{"id": Path(filename).stem, "title": filename, "content": data.decode("utf-8", errors="replace"), "source": filename, "page": 1, "content_type": "text"}]
-            if suffix in {".txt", ".md"}
-            else parse_binary(data, filename, suffix)
-        )
-        report = build_ingestion_report(documents, provider_mode="auto")
-        validated: list[DocumentModel] = []
-        warnings: list[str] = []
-        for document in documents:
-            item = {"id": document.get("id") or f"{Path(filename).stem}-1", "title": document.get("title") or filename, "source": document.get("source", filename), "page": document.get("page", 1), **document}
-            try:
-                validated.append(DocumentModel.model_validate(item))
-            except Exception as exc:
-                warnings.append(f"skip:{item.get('id', 'unknown')}:{exc}")
-        normalized = [doc.model_dump() for doc in validated]
-        if normalized:
-            retriever.replace_docs(retriever.docs + normalized)
-        return _ingestion_payload(filename, report["status"], report, warnings=warnings)
+        # PDF rendering and remote OCR/visions calls are CPU/IO heavy; keep them off the event loop.
+        return await run_in_threadpool(_process_ingestion, data, filename, suffix)
     except (ValueError, RuntimeError) as exc:
         return _ingestion_payload(filename, "failed", {}, str(exc))
 

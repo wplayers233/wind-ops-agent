@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from app.services.memory import MemoryStore
 
 
@@ -65,3 +67,37 @@ def test_memory_reports_fallback_mode_and_persistence_status() -> None:
     state = store.update("s-status", {"content": "变桨通讯中断", "component": "变桨系统"})
     assert state["memory_mode"] in {"memory_fallback", "redis+milvus"}
     assert state["persist_status"] == "queued"
+
+class _FailingMilvus:
+    available = True
+
+    def upsert(self, records):
+        raise RuntimeError("milvus down")
+
+
+def test_memory_persist_failure_is_reported(monkeypatch) -> None:
+    store = MemoryStore()
+    store.milvus_backend = _FailingMilvus()
+
+    store.update("s-persist-fail", {"content": "变桨通讯中断", "component": "变桨系统"})
+    store._executor.shutdown(wait=True)
+
+    state = store.get("s-persist-fail")
+    assert "milvus down" in state["persist_error"]
+    assert state["persist_status"] == "error"
+
+
+def test_memory_persist_recovers_after_backend_fix() -> None:
+    store = MemoryStore()
+    store.milvus_backend = _FailingMilvus()
+    store.update("s-persist-recover", {"content": "变桨通讯中断", "component": "变桨系统"})
+    store._executor.shutdown(wait=True)
+    assert store.get("s-persist-recover")["persist_status"] == "error"
+
+    store.milvus_backend = None
+    store._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="memory-write-recover")
+    store.update("s-persist-recover", {"content": "第二轮", "component": "变桨系统"})
+    store._executor.shutdown(wait=True)
+
+    assert store.get("s-persist-recover")["persist_status"] == "ready"
+    assert store.get("s-persist-recover")["persist_error"] == ""

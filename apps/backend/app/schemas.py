@@ -154,6 +154,7 @@ class IngestionResponse(BaseModel):
     vision_status: list[str] = Field(default_factory=list)
     embedding_status: str = ""
     error: str = ""
+    warnings: list[str] = Field(default_factory=list)
 
 class EvaluationResponse(BaseModel):
     dataset_version: str
