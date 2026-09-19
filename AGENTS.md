@@ -1,5 +1,14 @@
 # Repository Guidelines
 
+## Project Adapter
+
+- `@@PROJECT:wind-ops-agent@@` — multimodal RAG workbench for wind-turbine operations; a local, reproducible demo.
+- `@@TRUTH:memory-bank/@architecture.md@@` — internal truth source (architecture + owner map); `memory-bank/@design-document.md` holds the product definition. `README.md` is the external user-facing doc, not the internal truth source.
+- `@@COMMAND:./build.ps1@@` — root quality gate; see "Build, Test, and Development Commands" below for per-app commands.
+- `@@STACK:Python/FastAPI/LangGraph + React/TypeScript/Vite + pytest + Docker Compose@@`
+- `@@OWNER:memory-bank/@architecture.md (Owner Map section)@@` — single owner for every shared concept; `app/main.py` and the frontend may only adapt protocol/UI, never own domain semantics.
+- `@@BOUNDARY:offline-first demo@@` — external services (OCR, vision, embedding, reranker, Redis, Milvus) are optional adapters with explicit degradation; no production-ops, multi-tenant, or cloud scope.
+
 ## Project Structure & Module Organization
 
 This repository is a wind-operations RAG demo organized as a small monorepo:
@@ -29,7 +38,7 @@ Tests use `pytest` and are discovered as `test_*.py`. Name test functions `test_
 
 ## Commit & Pull Request Guidelines
 
-Git metadata is not present in this checkout, so no repository-specific history convention can be verified. Use short, imperative commit subjects (for example, `fix: preserve safety interrupt state`) and keep each commit focused. Pull requests should explain the user-visible change, link the relevant issue or work item, list validation commands, and include screenshots or API examples when UI or contract behavior changes. Call out configuration, migration, or new environment-variable requirements explicitly.
+The repository uses git; existing history follows short, imperative subjects (`feat: ...`, `fix: ...`). Keep each commit focused. Pull requests should explain the user-visible change, link the relevant issue or work item, list validation commands, and include screenshots or API examples when UI or contract behavior changes. Call out configuration, migration, or new environment-variable requirements explicitly.
 
 ## Security & Configuration Tips
 
