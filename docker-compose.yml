@@ -6,24 +6,30 @@ services:
       REDIS_URL: redis://redis:6379/0
       MILVUS_URI: http://milvus:19530
       MILVUS_ENABLED: "true"
-      VITE_API_BASE: http://localhost:8000
     ports:
       - "8000:8000"
     depends_on:
       redis:
         condition: service_healthy
       milvus:
-        condition: service_started
+        condition: service_healthy
   frontend:
-    build: ./apps/frontend
+    build:
+      context: ./apps/frontend
+      args:
+        VITE_API_BASE: http://localhost:8000
     ports:
       - "5173:80"
     depends_on:
       - backend
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
+    # Bound to localhost: same-host debugging stays possible, LAN exposure is cut.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,13 +42,17 @@ services:
       ETCD_AUTO_COMPACTION_RETENTION: 1000
       ETCD_QUOTA_BACKEND_BYTES: 4294967296
       ETCD_SNAPSHOT_COUNT: 50000
-    command: etcd --advertise-client-urls=http://etcd:2379 --listen-client-urls=http://0.0.0.0:2379 --listen-peer-urls=http://0.0.0.0:2380
+    command: etcd --advertise-client-urls=http://etcd:2379 --listen-client-urls=http://0.0.0.0:2379 --listen-peer-urls=http://0.0.0.0:2380 --data-dir=/etcd-data
+    volumes:
+      - etcd_data:/etcd-data
   minio:
     image: minio/minio:RELEASE.2024-05-10T01-41-38Z
     environment:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
     command: minio server /minio_data --console-address :9001
+    volumes:
+      - minio_data:/minio_data
   milvus:
     image: milvusdb/milvus:v2.4.6
     command: ["milvus", "run", "standalone"]
@@ -50,9 +60,21 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     ports:
-      - "19530:19530"
+      - "127.0.0.1:19530:19530"
+    volumes:
+      - milvus_data:/var/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     depends_on:
       - etcd
       - minio
 
-
+volumes:
+  redis_data:
+  etcd_data:
+  minio_data:
+  milvus_data:
