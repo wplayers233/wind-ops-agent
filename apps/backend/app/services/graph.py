@@ -26,6 +26,10 @@ from app.services.tools import (
 HIGH_RISK_QUESTIONS = ["是否已确认停机状态？", "现场是否已断电并挂牌？"]
 
 
+class ResumeNotAvailableError(Exception):
+    """Raised when a session has no pending safety confirmation to resume."""
+
+
 def _analysis_dict(analysis: Any) -> dict[str, Any]:
     return asdict(analysis) if hasattr(analysis, "__dataclass_fields__") else dict(analysis or {})
 
@@ -335,7 +339,10 @@ class GraphRunner:
         )
 
     def resume(self, session_id: str, confirmed: bool) -> dict[str, Any]:
-        return self.graph.invoke(Command(resume={"confirmed": confirmed}), {"configurable": {"thread_id": session_id}})
+        config = {"configurable": {"thread_id": session_id}}
+        if not self.graph.get_state(config).next:
+            raise ResumeNotAvailableError(f"会话 '{session_id}' 没有等待确认的高风险操作。")
+        return self.graph.invoke(Command(resume={"confirmed": confirmed}), config)
 
 
 runner = GraphRunner()

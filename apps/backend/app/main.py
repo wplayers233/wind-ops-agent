@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +25,7 @@ from app.services.agent import agent
 from app.services.conversations import CONVERSATIONS
 from app.services.corpus import build_ingestion_report, parse_binary
 from app.services.evaluator import evaluate_dataset
+from app.services.graph import ResumeNotAvailableError
 from app.services.metrics import get_system_metrics
 from app.services.retriever import retriever
 
@@ -126,7 +127,10 @@ def chat(payload: ChatRequest) -> dict:
 
 @app.post("/chat/{session_id}/resume", response_model=ChatResponse)
 def resume_chat(session_id: str, payload: ChatResumeRequest) -> dict:
-    return agent.resume(session_id, payload.confirmed)
+    try:
+        return agent.resume(session_id, payload.confirmed)
+    except ResumeNotAvailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/retrieve", response_model=RetrieveResponse)
@@ -180,10 +184,13 @@ def ticket(payload: TicketRequest) -> dict:
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def frontend_app(full_path: str) -> FileResponse:
-    index_file = FRONTEND_DIST / "index.html"
-    requested_file = FRONTEND_DIST / full_path
-    if full_path and requested_file.is_file():
+    dist_root = FRONTEND_DIST.resolve()
+    requested_file = (FRONTEND_DIST / full_path).resolve()
+    if full_path and requested_file.is_file() and requested_file.is_relative_to(dist_root):
         return FileResponse(requested_file)
-    return FileResponse(index_file)
+    index_file = dist_root / "index.html"
+    if index_file.is_file():
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="frontend build not found")
 
 

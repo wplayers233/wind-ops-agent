@@ -79,7 +79,7 @@ def test_health_check_skips_retrieval_and_llm(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", spy_retriever)
     llm = StubLLM("模型答案")
 
-    response = WindOpsAgent(llm_client=llm).chat("s-health", "系统在吗")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=llm).chat("s-health", "系统在吗")
 
     assert_common_shape(response)
     assert response["intent"]["name"] == "health_check"
@@ -93,7 +93,7 @@ def test_missing_slots_returns_clarification_without_fake_diagnosis(monkeypatch)
     monkeypatch.setattr(agent_module, "retriever", spy_retriever)
     llm = StubLLM("模型答案")
 
-    response = WindOpsAgent(llm_client=llm).chat("s-clarify", "怎么排查？")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=llm).chat("s-clarify", "怎么排查？")
 
     assert_common_shape(response)
     assert response["llm_used"] is False
@@ -108,7 +108,7 @@ def test_normal_diagnosis_calls_nodes_and_writes_two_memory_records(monkeypatch)
     spy_retriever = SpyRetriever([RetrievedDoc(DOC, 2.5, {"keyword": 1.0})])
     monkeypatch.setattr(agent_module, "retriever", spy_retriever)
 
-    response = WindOpsAgent(llm_client=StubLLM()).chat("s-normal", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM()).chat("s-normal", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
 
     assert_common_shape(response)
     assert len(spy_retriever.calls) == 1
@@ -122,7 +122,7 @@ def test_normal_diagnosis_calls_nodes_and_writes_two_memory_records(monkeypatch)
 def test_no_evidence_returns_rule_fallback_with_empty_citations(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([]))
 
-    response = WindOpsAgent(llm_client=StubLLM()).chat("s-empty", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM()).chat("s-empty", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
 
     assert_common_shape(response)
     assert response["llm_used"] is False
@@ -135,7 +135,7 @@ def test_no_evidence_returns_rule_fallback_with_empty_citations(monkeypatch) -> 
 def test_unconfigured_llm_sets_llm_used_false(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([RetrievedDoc(DOC, 2.5, {})]))
 
-    response = WindOpsAgent(llm_client=StubLLM()).chat("s-no-key", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM()).chat("s-no-key", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
 
     assert_common_shape(response)
     assert response["llm_used"] is False
@@ -144,7 +144,7 @@ def test_unconfigured_llm_sets_llm_used_false(monkeypatch) -> None:
 def test_llm_success_sets_llm_used_true(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([RetrievedDoc(DOC, 2.5, {})]))
 
-    response = WindOpsAgent(llm_client=StubLLM("确认停机、断电、挂牌后，检查母线电压。" )).chat(
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM("确认停机、断电、挂牌后，检查母线电压。" )).chat(
         "s-llm", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？"
     )
 
@@ -186,7 +186,7 @@ def test_llm_http_timeout_bad_json_and_empty_text_degrade(monkeypatch, body, exc
     client = LLMClient(api_key="test-key", base_url="http://llm.example/v1", timeout=20)
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([RetrievedDoc(DOC, 2.5, {})]))
 
-    response = WindOpsAgent(llm_client=client).chat("s-degrade", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=client).chat("s-degrade", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
 
     assert_common_shape(response)
     assert response["llm_used"] is False
@@ -196,7 +196,7 @@ def test_llm_http_timeout_bad_json_and_empty_text_degrade(monkeypatch, body, exc
 def test_high_risk_llm_answer_keeps_safety_prerequisites(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([RetrievedDoc(DOC, 2.5, {})]))
 
-    response = WindOpsAgent(llm_client=StubLLM("直接打开柜门检查即可。" )).chat(
+    response = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM("直接打开柜门检查即可。" )).chat(
         "s-risk", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？"
     )
 
@@ -210,7 +210,7 @@ def test_high_risk_llm_answer_keeps_safety_prerequisites(monkeypatch) -> None:
 
 def test_two_sessions_memory_is_isolated(monkeypatch) -> None:
     monkeypatch.setattr(agent_module, "retriever", SpyRetriever([RetrievedDoc(DOC, 2.5, {})]))
-    agent = WindOpsAgent(llm_client=StubLLM())
+    agent = WindOpsAgent(auto_confirm_high_risk=True, llm_client=StubLLM())
 
     agent.chat("session-a", "2.5MW 变流器直流母线过压，报 CONV_DC_OV 怎么处理？")
     agent.chat("session-b", "系统在吗")

@@ -34,15 +34,15 @@ VISIBLE_RESPONSE_KEYS = {
 class WindOpsAgent:
     runner: GraphRunner | None = None
     llm_client: Any | None = None
+    # Explicit opt-in only: high-risk confirmation can never be disabled implicitly.
+    auto_confirm_high_risk: bool = False
 
     def __post_init__(self) -> None:
         if self.runner is None:
-            # Inject the legacy dependencies into the graph so existing callers and tests remain isolated.
-            legacy_mode = self.llm_client is not None
             self.runner = GraphRunner(
                 retriever_obj=retriever,
-                model=self.llm_client if legacy_mode else None,
-                auto_confirm_high_risk=legacy_mode,
+                model=self.llm_client,
+                auto_confirm_high_risk=self.auto_confirm_high_risk,
             )
         self.llm_client = self.llm_client or SimpleNamespace(api_key=None)
 
