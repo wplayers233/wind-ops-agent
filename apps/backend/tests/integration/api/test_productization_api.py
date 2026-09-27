@@ -62,3 +62,30 @@ def test_ingest_rejects_oversized_upload(monkeypatch):
 
     assert response.json()['status'] == 'failed'
     assert 'upload limit' in response.json()['error']
+
+
+def test_ingest_corrupt_pdf_degrades_to_failed_status():
+    response = TestClient(app).post('/ingest', files={'file': ('corrupt.pdf', b'this is not a real pdf', 'application/pdf')})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body['status'] == 'failed'
+    assert body['error']
+
+
+def test_ingest_empty_pdf_degrades_to_failed_status():
+    response = TestClient(app).post('/ingest', files={'file': ('empty.pdf', b'', 'application/pdf')})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body['status'] == 'failed'
+    assert body['error']
+
+
+def test_ingest_corrupt_pptx_degrades_to_failed_status():
+    response = TestClient(app).post('/ingest', files={'file': ('corrupt.pptx', b'not a pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body['status'] == 'failed'
+    assert body['error']

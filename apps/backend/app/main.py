@@ -173,7 +173,9 @@ async def ingest(file: UploadFile = File(...)) -> dict:
     try:
         # PDF rendering and remote OCR/visions calls are CPU/IO heavy; keep them off the event loop.
         return await run_in_threadpool(_process_ingestion, data, filename, suffix)
-    except (ValueError, RuntimeError) as exc:
+    except Exception as exc:
+        # Parser libraries raise their own exception families (pypdf, python-pptx, ...).
+        # The ingest boundary maps every parse failure to the structured failed contract.
         return _ingestion_payload(filename, "failed", {}, str(exc))
 
 
