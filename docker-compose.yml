@@ -5,9 +5,16 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       MILVUS_URI: http://milvus:19530
-      MILVUS_ENABLED: "true"
+      # memory.py only reads MEMORY_REMOTE_ENABLED; Redis/Milvus stay in fallback otherwise.
+      MEMORY_REMOTE_ENABLED: "true"
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     depends_on:
       redis:
         condition: service_healthy
@@ -21,7 +28,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
