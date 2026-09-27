@@ -8,7 +8,7 @@
 面向风电设备运维的多模态 RAG 工作台，前后端分离的小型 monorepo：
 
 - `apps/backend/`：FastAPI 服务（Python），承载全部业务语义。
-- `apps/frontend/`：React + TypeScript + Vite 单页 UI，只消费后端 API（已模块化：`src/api.ts` 统一请求、`src/components/`、`src/pages/`、`src/types.ts`，`App.tsx` 只做装配）。
+- `apps/frontend/`：React + TypeScript + Vite 单页 UI，只消费后端 API（已模块化：`src/api.ts` 统一请求、`src/components/`、`src/pages/`、`src/types.ts` 共享类型、`src/format.ts` 格式化，`App.tsx` 只做装配）。
 - `build.ps1`：根质量门 = 后端门禁（`apps/backend/scripts/build.py`：AST 语法检查 → 全量 pytest → 可选在线冒烟）+ 前端生产构建（`tsc --noEmit && vite build`）。
 - `docker-compose.yml`：本地 Redis / Milvus / 应用服务编排。
 
@@ -38,7 +38,7 @@
 | 评估 | `app/services/evaluator.py` + `app/services/ragas_adapter.py` | 黄金集 `app/data/evaluation/golden_path.jsonl`；Ragas 优先，未配置时离线 fallback |
 | 指标 | `app/services/metrics.py` | `/metrics` 数据源（`get_system_metrics`） |
 | 实验/耗时度量 | `app/services/experiment.py` | `TaskMeasurement` |
-| 用户界面 | `apps/frontend/src/*` | 模块化 React 应用（`api.ts` 请求层 + `components/` + `pages/`）；只消费 API 结构化状态 |
+| 用户界面 | `apps/frontend/src/*` | 模块化 React 应用（`api.ts` 请求层 + `types.ts` 类型 + `format.ts` 格式化 + `components/` + `pages/`）；`App.tsx` 是前端唯一状态 owner，页面/组件经 props 消费状态与回调；只消费 API 结构化状态 |
 
 **禁止成为 owner 的层**：`app/main.py`（HTTP 映射）、`apps/frontend/src/*`（UI）、`apps/backend/scripts/`、`docker-compose.yml`。它们只做接线、展示和基础设施，不得拥有业务语义、状态机或用户可见结论。
 
@@ -81,6 +81,11 @@ provider 状态与降级原因必须在证据和响应中可观测，禁止伪�
 
 ## 8. 变更记录
 
+- 2026-09-20 入库解析失败结构化降级：
+  - `/ingest` 边界（`app/main.py`）把任意解析器异常（pypdf `PdfReadError`、python-pptx 包错误等非 ValueError/RuntimeError 族）映射为 HTTP 200 + `status: "failed"` + `error` 字段，损坏/空文件不再返回 500；回归测试见 `tests/integration/api/test_productization_api.py`（corrupt/empty PDF、corrupt PPTX 三用例）。
+  - 前端 `src/api.ts`：非 2xx 错误优先展示响应体 JSON 的 `detail` 字段，不再把原始 JSON 透传给用户。
+  - `docker-compose.yml`：backend 的死配置 `MILVUS_ENABLED`（代码从未读取）替换为真实开关 `MEMORY_REMOTE_ENABLED`，Docker 部署中远程记忆真正生效；backend 增加 `/health` healthcheck，frontend 依赖改为 `service_healthy`，与 redis/milvus 既有模式对齐。
+  - 前端视觉主题切换为 Claude 风格暖色调（仅 `src/styles.css`，组件结构不动）：米白底 `#faf9f5`、赤陶强调色 `#c96442`（原蓝色 `--blue/--blue-soft` 更名 `--accent/--accent-soft`）、衬线标题（Source Serif 4 + Noto Serif SC）、暖沙用户气泡、铜色品牌锚点与纯色主按钮、暖色滚动条/选区；语义色（红/黄/绿风险）保持不变。
 - 2026-09-19 安全与正确性加固（commit `6263e99` / `2ccab9e` / `72d0ce8`）：
   - SPA 兜底路由 `resolve` + `is_relative_to` 防路径穿越；dist 未构建时 404 而非 500。
   - `resume` 增加会话守卫（`ResumeNotAvailableError` → 404），不再对未知/已结束会话 500。
